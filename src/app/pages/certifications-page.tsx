@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Plus,
@@ -24,19 +24,28 @@ import {
   DialogFooter,
 } from '../components/ui/dialog';
 import {
-  getAllCertifications,
-  createCertification,
-  updateCertification,
-  deleteCertification,
-} from '../lib/store';
+  getAllCertificationsFromDb,
+  createCertificationInDb,
+  updateCertificationInDb,
+  deleteCertificationInDb,
+} from '../lib/db';
 import type { Certification } from '../lib/types';
 import { toast } from 'sonner';
 
 function formatDate(dateStr: string): string {
   if (!dateStr) return '';
   const [year, month] = dateStr.split('-');
+  if (!month) return year;
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   return `${months[parseInt(month, 10) - 1]} ${year}`;
+}
+
+function isExpired(expiryDate: string): boolean {
+  if (!expiryDate) return false;
+  const now = new Date();
+  const [year, month] = expiryDate.split('-');
+  const expiry = new Date(parseInt(year), parseInt(month) - 1);
+  return expiry < now;
 }
 
 /* ── Form Dialog ── */
@@ -63,21 +72,16 @@ function CertFormDialog({
 
   const isEditing = !!certification;
 
-  useState(() => {
-    // Reset form
-  });
-
-  // Sync form state when certification/open changes
-  const _ = useMemo(() => {
+  useEffect(() => {
     if (certification) {
-      setName(certification.name);
-      setOrganization(certification.organization);
-      setIssueDate(certification.issueDate);
+      setName(certification.name || '');
+      setOrganization(certification.organization || '');
+      setIssueDate(certification.issueDate || '');
       setExpiryDate(certification.expiryDate || '');
       setCredentialId(certification.credentialId || '');
       setCredentialUrl(certification.credentialUrl || '');
       setImage(certification.image || '');
-      setSkills(certification.skills);
+      setSkills(certification.skills || []);
     } else if (open) {
       setName('');
       setOrganization('');
@@ -89,8 +93,6 @@ function CertFormDialog({
       setSkills([]);
       setSkillInput('');
     }
-    return null;
-  // eslint-disable-next-line
   }, [certification, open]);
 
   const handleAddSkill = () => {
@@ -250,25 +252,44 @@ function CertFormDialog({
 
 /* ── Main Page ── */
 export function CertificationsPage() {
-  const [certifications, setCertifications] = useState<Certification[]>(getAllCertifications);
+  const [certifications, setCertifications] = useState<Certification[]>([]);
+  const [loading, setLoading] = useState(true);
   const [formOpen, setFormOpen] = useState(false);
   const [editingCert, setEditingCert] = useState<Certification | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
 
-  const refresh = useCallback(() => {
-    setCertifications(getAllCertifications());
+  const refresh = useCallback(async () => {
+    const data = await getAllCertificationsFromDb();
+    setCertifications(data);
+  }, []);
+
+  useEffect(() => {
+    async function load() {
+      const data = await getAllCertificationsFromDb();
+      setCertifications(data);
+      setLoading(false);
+    }
+    load();
   }, []);
 
   const handleSave = useCallback(
-    (data: Partial<Certification>) => {
+    async (data: Partial<Certification>) => {
       if (editingCert) {
-        updateCertification(editingCert.id, data);
-        toast.success('Certification updated!');
+        const result = await updateCertificationInDb(editingCert.id, data);
+        if (result) {
+          toast.success('Certification updated!');
+        } else {
+          toast.error('Failed to update certification');
+        }
       } else {
-        createCertification(data);
-        toast.success('Certification added!');
+        const result = await createCertificationInDb(data);
+        if (result) {
+          toast.success('Certification added!');
+        } else {
+          toast.error('Failed to add certification');
+        }
       }
       setEditingCert(null);
       refresh();
@@ -291,10 +312,14 @@ export function CertificationsPage() {
     setDeleteDialogOpen(true);
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (deletingId) {
-      deleteCertification(deletingId);
-      toast.success('Certification deleted.');
+      const result = await deleteCertificationInDb(deletingId);
+      if (result) {
+        toast.success('Certification deleted.');
+      } else {
+        toast.error('Failed to delete certification');
+      }
       setDeleteDialogOpen(false);
       setDeletingId(null);
       refresh();
@@ -391,9 +416,26 @@ export function CertificationsPage() {
 
                   <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
                     <Calendar className="w-3 h-3" />
-                    <span>{formatDate(cert.issueDate)}</span>
+                    <span>{formatDate(cert.issueDate) || 'N/A'}</span>
                     {cert.expiryDate && (
-                      <span>&middot; Exp. {formatDate(cert.expiryDate)}</span>
+                      <span className={isExpired(cert.expiryDate) ? 'text-red-500' : ''}>
+                        &middot; Exp. {formatDate(cert.expiryDate)}
+                      </span>
+                    )}
+                    {!cert.expiryDate && (
+                      <Badge variant="outline" className="text-[10px] h-5 bg-emerald-500/10 text-emerald-600 border-emerald-500/30">
+                        Active
+                      </Badge>
+                    )}
+                    {cert.expiryDate && !isExpired(cert.expiryDate) && (
+                      <Badge variant="outline" className="text-[10px] h-5 bg-emerald-500/10 text-emerald-600 border-emerald-500/30">
+                        Active
+                      </Badge>
+                    )}
+                    {cert.expiryDate && isExpired(cert.expiryDate) && (
+                      <Badge variant="outline" className="text-[10px] h-5 bg-red-500/10 text-red-600 border-red-500/30">
+                        Expired
+                      </Badge>
                     )}
                   </div>
 

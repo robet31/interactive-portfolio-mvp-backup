@@ -29,7 +29,7 @@ const wordVariants = {
     filter: 'blur(0px)',
     transition: { 
       duration: 0.6, 
-      ease: [0.25, 0.46, 0.45, 0.94],
+      ease: [0.25, 0.46, 0.45, 0.94] as const,
     },
   },
 };
@@ -134,13 +134,16 @@ export function HeroSection() {
       />
 
       {/* Gradient overlay for readability */}
-      <div className="absolute inset-0 bg-gradient-to-r from-background/80 via-background/50 to-transparent" />
-      <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-background/40" />
+      <div className="absolute inset-0 bg-gradient-to-r from-background/80 via-background/50 to-transparent z-[5]" />
+      <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-background/40 z-[5]" />
 
       {/* Cover Unicorn Studio watermark — full-width strip at bottom */}
       <div 
-        className="absolute bottom-0 left-0 right-0 h-32 bg-background z-[9999] pointer-events-none"
-        style={{ marginBottom: '-20px' }}
+        className="absolute bottom-0 left-0 right-0 h-20 z-[9998] pointer-events-none"
+        style={{ 
+          marginBottom: '-20px',
+          background: 'linear-gradient(to top, var(--background) 60%, transparent)'
+        }}
       />
       <style>{`
         [data-us-watermark] {

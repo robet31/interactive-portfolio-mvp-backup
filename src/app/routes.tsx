@@ -1,19 +1,21 @@
+import { lazy, Suspense } from 'react';
 import { createBrowserRouter } from 'react-router';
 import { PublicLayout } from './components/layout/public-layout';
 import { DashboardLayout } from './components/dashboard/dashboard-layout';
-import { HomePage } from './pages/home-page';
-import { BlogPage } from './pages/blog-page';
-import { ArticlePage } from './pages/article-page';
 import { LoginPage } from './pages/login-page';
-import { DashboardPage } from './pages/dashboard-page';
-import { PostsPage } from './pages/posts-page';
-import { EditorPage } from './pages/editor-page';
-import { LogGeneratorPage } from './pages/log-generator-page';
-import { ExperiencesPage } from './pages/experiences-page';
-import { ProjectsManagementPage } from './pages/projects-management-page';
-import { CertificationsPage } from './pages/certifications-page';
-import { DailyLogsPage } from './pages/daily-logs-page';
 import { NotFoundPage, RouteErrorPage } from './pages/not-found-page';
+
+const HomePage = lazy(() => import('./pages/home-page').then(m => ({ default: m.HomePage })));
+const BlogPage = lazy(() => import('./pages/blog-page').then(m => ({ default: m.BlogPage })));
+const ArticlePage = lazy(() => import('./pages/article-page').then(m => ({ default: m.ArticlePage })));
+const DashboardPage = lazy(() => import('./pages/dashboard-page').then(m => ({ default: m.DashboardPage })));
+const PostsPage = lazy(() => import('./pages/posts-page').then(m => ({ default: m.PostsPage })));
+const EditorPage = lazy(() => import('./pages/editor-page').then(m => ({ default: m.EditorPage })));
+const LogGeneratorPage = lazy(() => import('./pages/log-generator-page').then(m => ({ default: m.LogGeneratorPage })));
+const ExperiencesPage = lazy(() => import('./pages/experiences-page').then(m => ({ default: m.ExperiencesPage })));
+const ProjectsManagementPage = lazy(() => import('./pages/projects-management-page').then(m => ({ default: m.ProjectsManagementPage })));
+const CertificationsPage = lazy(() => import('./pages/certifications-page').then(m => ({ default: m.CertificationsPage })));
+const DailyLogsPage = lazy(() => import('./pages/daily-logs-page').then(m => ({ default: m.DailyLogsPage })));
 
 export const router = createBrowserRouter([
   {

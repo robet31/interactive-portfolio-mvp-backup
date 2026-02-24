@@ -1,13 +1,14 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { ExternalLink, ImageOff, FolderKanban } from 'lucide-react';
 import { Badge } from '../ui/badge';
-import { getAllProjects } from '../../lib/store';
+import { getAllProjectsFromDb } from '../../lib/db';
+import type { Project } from '../../lib/types';
 
 /* ═══════════════════════════════════════════
    MOBILE: Compact project card — no large image
    ═══════════════════════════════════════════ */
-function MobileProjectCard({ project }: { project: ReturnType<typeof getAllProjects>[0] }) {
+function MobileProjectCard({ project }: { project: Project }) {
   return (
     <div className="flex items-start gap-3 p-3.5 rounded-xl bg-card border border-border/60 hover:border-primary/20 transition-all group">
       <div className="flex-shrink-0 w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center">
@@ -48,7 +49,38 @@ function MobileProjectCard({ project }: { project: ReturnType<typeof getAllProje
 }
 
 export function ProjectsSection() {
-  const [projects] = useState(getAllProjects);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadProjects() {
+      const data = await getAllProjectsFromDb();
+      setProjects(data);
+      setLoading(false);
+    }
+    loadProjects();
+  }, []);
+
+  if (loading) {
+    return (
+      <section id="projects" className="py-16 md:py-24 bg-card/30">
+        <div className="max-w-6xl mx-auto px-6">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.5 }}
+            className="text-center mb-8 md:mb-16"
+          >
+            <span className="text-primary text-sm tracking-widest uppercase">Portofolio</span>
+            <h2 className="!text-2xl sm:!text-3xl md:!text-4xl text-foreground mt-3">
+              Featured Projects
+            </h2>
+          </motion.div>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section id="projects" className="py-16 md:py-24 bg-card/30">

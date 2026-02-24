@@ -1,9 +1,11 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Briefcase, GraduationCap, Award, Calendar, Building2, Heart, Users } from 'lucide-react';
 import { Badge } from '../ui/badge';
+import { Skeleton } from '../ui/skeleton';
 import { ImageWithFallback } from '../figma/ImageWithFallback';
-import { getAllExperiences } from '../../lib/store';
+import { ImageLightbox, ImageGalleryGrid } from '../ui/image-lightbox';
+import { getAllExperiencesFromDb } from '../../lib/db';
 import type { Experience } from '../../lib/types';
 
 const typeIcon: Record<string, typeof Briefcase> = {
@@ -55,6 +57,7 @@ function extractYear(exp: Experience): string {
   if (exp.startDate) {
     return exp.startDate.split('-')[0];
   }
+  if (!exp.period) return 'Unknown';
   const match = exp.period.match(/\d{4}/);
   return match ? match[0] : 'Unknown';
 }
@@ -90,84 +93,131 @@ function MobileCompactCard({ exp }: { exp: Experience }) {
    ═══════════════════════════════════════════ */
 function InteractiveListCard({ exp }: { exp: Experience }) {
   const [isHovered, setIsHovered] = useState(false);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState(0);
   const Icon = typeIcon[exp.type] || Briefcase;
 
-  return (
-    <div
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-      className="relative overflow-hidden rounded-xl border border-border/50 bg-card/40 hover:bg-card hover:border-primary/30 transition-all duration-300 cursor-pointer group"
-    >
-      {/* ── Tampilan List (Ringkas) ── */}
-      <div className="flex items-center justify-between p-4 md:p-5">
-        <div className="flex items-center gap-4">
-          <div className={`p-2.5 rounded-lg flex-shrink-0 ${typeDotColor[exp.type]}`}>
-            <Icon className="w-5 h-5" />
-          </div>
-          <div>
-            <h4 className="font-semibold text-foreground group-hover:text-primary transition-colors">
-              {exp.title}
-            </h4>
-            <p className="text-sm text-primary/80">{exp.organization}</p>
-          </div>
-        </div>
-        <div className="text-sm font-medium text-muted-foreground whitespace-nowrap hidden sm:block">
-          {exp.period}
-        </div>
-      </div>
+  // Get images array - prioritize new images field, fallback to old image field
+  const images = exp.images && exp.images.length > 0 
+    ? exp.images 
+    : exp.image 
+      ? [exp.image] 
+      : [];
 
-      {/* ── Tampilan Dropdown (Muncul Pas Di-hover) ── */}
-      <AnimatePresence>
-        {isHovered && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.3, ease: 'easeInOut' }}
-          >
-            <div className="px-4 md:px-5 pb-5 pt-2 border-t border-border/50 flex flex-col md:flex-row gap-5">
-              {/* Gambar kalau ada */}
-              {exp.image && (
-                <div className="w-full md:w-48 h-32 flex-shrink-0 rounded-lg overflow-hidden relative">
-                  <ImageWithFallback
-                    src={exp.image}
-                    alt={exp.title}
-                    className="w-full h-full object-cover"
-                  />
-                  <div className="absolute top-2 left-2">
-                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] text-white/90 backdrop-blur-md ${typeBadgeBg[exp.type]}`}>
-                      <Icon className="w-3 h-3" />
-                      {typeLabel[exp.type]}
-                    </span>
+  const handleImageClick = (index: number) => {
+    setLightboxIndex(index);
+    setLightboxOpen(true);
+  };
+
+  return (
+    <>
+      <div
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+        className="relative overflow-hidden rounded-xl border border-border/50 bg-card/40 hover:bg-card hover:border-primary/30 transition-all duration-300 cursor-pointer group"
+      >
+        {/* ── Tampilan List (Ringkas) ── */}
+        <div className="flex items-center justify-between p-4 md:p-5">
+          <div className="flex items-center gap-4">
+            <div className={`p-2.5 rounded-lg flex-shrink-0 ${typeDotColor[exp.type]}`}>
+              <Icon className="w-5 h-5" />
+            </div>
+            <div>
+              <h4 className="font-semibold text-foreground group-hover:text-primary transition-colors">
+                {exp.title}
+              </h4>
+              <p className="text-sm text-primary/80">{exp.organization}</p>
+            </div>
+          </div>
+          <div className="text-sm font-medium text-muted-foreground whitespace-nowrap hidden sm:block">
+            {exp.period}
+          </div>
+        </div>
+
+        {/* ── Tampilan Dropdown (Muncul Pas Di-hover) ── */}
+        <AnimatePresence>
+          {isHovered && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.3, ease: 'easeInOut' }}
+            >
+              <div className="px-4 md:px-5 pb-5 pt-2 border-t border-border/50 flex flex-col md:flex-row gap-5">
+                {/* Gambar/Gallery kalau ada */}
+                {images.length > 0 && (
+                  <div className="w-full md:w-48 flex-shrink-0">
+                    {images.length === 1 ? (
+                      <div 
+                        className="w-full h-32 rounded-lg overflow-hidden relative cursor-pointer"
+                        onClick={() => handleImageClick(0)}
+                      >
+                        <ImageWithFallback
+                          src={images[0]}
+                          alt={exp.title}
+                          className="w-full h-full object-cover"
+                        />
+                        <div className="absolute top-2 left-2">
+                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] text-white/90 backdrop-blur-md ${typeBadgeBg[exp.type]}`}>
+                            <Icon className="w-3 h-3" />
+                            {typeLabel[exp.type]}
+                          </span>
+                        </div>
+                      </div>
+                    ) : (
+                      <ImageGalleryGrid 
+                        images={images} 
+                        onImageClick={handleImageClick}
+                        className="w-full"
+                      />
+                    )}
+                  </div>
+                )}
+
+                {/* Deskripsi & Tag */}
+                <div className="flex-1 space-y-3">
+                  <p className="text-sm text-muted-foreground leading-relaxed">
+                    {exp.description}
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {exp.tags.map(tag => (
+                      <Badge key={tag} variant="secondary" className="rounded-md text-xs px-2 py-0.5">
+                        {tag}
+                      </Badge>
+                    ))}
                   </div>
                 </div>
-              )}
-
-              {/* Deskripsi & Tag */}
-              <div className="flex-1 space-y-3">
-                <p className="text-sm text-muted-foreground leading-relaxed">
-                  {exp.description}
-                </p>
-                <div className="flex flex-wrap gap-1.5">
-                  {exp.tags.map(tag => (
-                    <Badge key={tag} variant="secondary" className="rounded-md text-xs px-2 py-0.5">
-                      {tag}
-                    </Badge>
-                  ))}
-                </div>
               </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+
+      {/* Lightbox */}
+      <ImageLightbox
+        images={images}
+        initialIndex={lightboxIndex}
+        open={lightboxOpen}
+        onOpenChange={setLightboxOpen}
+      />
+    </>
   );
 }
 
 export function ExperienceSection() {
-  const yearGroups = useMemo<YearGroup[]>(() => {
-    const experiences = getAllExperiences();
+  const [experiences, setExperiences] = useState<Experience[]>([]);
+  const [loading, setLoading] = useState(true);
 
+  useEffect(() => {
+    async function loadExperiences() {
+      const data = await getAllExperiencesFromDb();
+      setExperiences(data);
+      setLoading(false);
+    }
+    loadExperiences();
+  }, []);
+
+  const yearGroups = useMemo<YearGroup[]>(() => {
     const sorted = [...experiences].sort((a, b) => {
       const aDate = a.startDate || '0000-00';
       const bDate = b.startDate || '0000-00';
@@ -184,7 +234,30 @@ export function ExperienceSection() {
     return Object.keys(groups)
       .sort((a, b) => b.localeCompare(a))
       .map(year => ({ year, items: groups[year] }));
-  }, []);
+  }, [experiences]);
+
+  if (loading) {
+    return (
+      <section className="py-16 md:py-24">
+        <div className="max-w-6xl mx-auto px-6">
+          <div className="text-center mb-10 md:mb-16">
+            <span className="text-primary text-sm tracking-widest uppercase">Pengalaman</span>
+            <h2 className="!text-2xl sm:!text-3xl md:!text-4xl text-foreground mt-3">
+              Experience & Journey
+            </h2>
+          </div>
+          
+          {/* Simple Loading - Fast */}
+          <div className="flex items-center justify-center py-20">
+            <div className="flex flex-col items-center gap-3">
+              <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+              <span className="text-muted-foreground text-sm">Loading...</span>
+            </div>
+          </div>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section className="py-16 md:py-24">

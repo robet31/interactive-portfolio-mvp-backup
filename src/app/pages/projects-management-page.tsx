@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Plus,
@@ -30,11 +30,11 @@ import {
 import { ImageWithFallback } from '../components/figma/ImageWithFallback';
 import { ProjectFormDialog } from '../components/dashboard/project-form-dialog';
 import {
-  getAllProjects,
-  createProject,
-  updateProject,
-  deleteProject,
-} from '../lib/store';
+  getAllProjectsFromDb,
+  createProjectInDb,
+  updateProjectInDb,
+  deleteProjectInDb,
+} from '../lib/db';
 import type { Project } from '../lib/types';
 import { toast } from 'sonner';
 
@@ -49,7 +49,8 @@ const categoryColors: Record<string, string> = {
 };
 
 export function ProjectsManagementPage() {
-  const [projects, setProjects] = useState<Project[]>(getAllProjects);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [loading, setLoading] = useState(true);
   const [formOpen, setFormOpen] = useState(false);
   const [editingProj, setEditingProj] = useState<Project | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -57,18 +58,36 @@ export function ProjectsManagementPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterCategory, setFilterCategory] = useState<string>('all');
 
-  const refresh = useCallback(() => {
-    setProjects(getAllProjects());
+  const refresh = useCallback(async () => {
+    const data = await getAllProjectsFromDb();
+    setProjects(data);
+  }, []);
+
+  useEffect(() => {
+    async function load() {
+      const data = await getAllProjectsFromDb();
+      setProjects(data);
+      setLoading(false);
+    }
+    load();
   }, []);
 
   const handleSave = useCallback(
-    (data: Partial<Project>) => {
+    async (data: Partial<Project>) => {
       if (editingProj) {
-        updateProject(editingProj.id, data);
-        toast.success('Project updated!');
+        const result = await updateProjectInDb(editingProj.id, data);
+        if (result) {
+          toast.success('Project updated!');
+        } else {
+          toast.error('Failed to update project');
+        }
       } else {
-        createProject(data);
-        toast.success('Project added!');
+        const result = await createProjectInDb(data);
+        if (result) {
+          toast.success('Project added!');
+        } else {
+          toast.error('Failed to add project');
+        }
       }
       setEditingProj(null);
       refresh();
@@ -91,10 +110,14 @@ export function ProjectsManagementPage() {
     setDeleteDialogOpen(true);
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (deletingId) {
-      deleteProject(deletingId);
-      toast.success('Project deleted.');
+      const result = await deleteProjectInDb(deletingId);
+      if (result) {
+        toast.success('Project deleted.');
+      } else {
+        toast.error('Failed to delete project');
+      }
       setDeleteDialogOpen(false);
       setDeletingId(null);
       refresh();

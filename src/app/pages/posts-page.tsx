@@ -1,16 +1,28 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { Link } from 'react-router';
 import { motion } from 'motion/react';
 import { PenSquare } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { ArticleTable } from '../components/dashboard/article-table';
-import { getAllPosts } from '../lib/store';
+import { getAllPostsFromDb } from '../lib/db';
+import type { Post } from '../lib/types';
 
 export function PostsPage() {
-  const [posts, setPosts] = useState(getAllPosts);
+  const [posts, setPosts] = useState<Post[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const refresh = useCallback(() => {
-    setPosts(getAllPosts());
+  const refresh = useCallback(async () => {
+    const data = await getAllPostsFromDb();
+    setPosts(data);
+  }, []);
+
+  useEffect(() => {
+    async function loadPosts() {
+      const data = await getAllPostsFromDb();
+      setPosts(data);
+      setLoading(false);
+    }
+    loadPosts();
   }, []);
 
   return (

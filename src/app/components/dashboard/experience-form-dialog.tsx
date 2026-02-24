@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Briefcase, GraduationCap, Award, X, Plus, Building2, Heart, Users, ArrowUpDown } from 'lucide-react';
+import { Briefcase, GraduationCap, Award, X, Plus, Building2, Heart, Users, ArrowUpDown, Info, Star, ImagePlus, Trash2, Loader2 } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -19,6 +19,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '../ui/select';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '../ui/tooltip';
 import type { Experience, ExperienceType } from '../../lib/types';
 import { ImageUploadField } from './image-upload-field';
 
@@ -26,7 +32,7 @@ interface ExperienceFormDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   experience?: Experience | null;
-  onSave: (data: Partial<Experience>) => void;
+  onSave: (data: Partial<Experience>) => Promise<boolean>;
 }
 
 const typeOptions = [
@@ -53,7 +59,9 @@ export function ExperienceFormDialog({
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState('');
   const [image, setImage] = useState('');
+  const [images, setImages] = useState<string[]>([]);
   const [sortOrder, setSortOrder] = useState('0');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const isEditing = !!experience;
 
@@ -67,6 +75,7 @@ export function ExperienceFormDialog({
       setType(experience.type || 'work');
       setTags(experience.tags || []);
       setImage(experience.image || '');
+      setImages(experience.images || []);
       
       // Mengambil data sortOrder, pakai any sementara biar tidak error TS
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -81,6 +90,7 @@ export function ExperienceFormDialog({
       setTags([]);
       setTagInput('');
       setImage('');
+      setImages([]);
       setSortOrder('0');
     }
   }, [experience, open]);
@@ -104,11 +114,23 @@ export function ExperienceFormDialog({
     setTags(tags.filter(t => t !== tag));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!title.trim()) return;
+  const handleAddImage = (url: string) => {
+    if (url.trim() && !images.includes(url.trim())) {
+      setImages([...images, url.trim()]);
+    }
+  };
 
-    onSave({
+  const handleRemoveImage = (index: number) => {
+    setImages(images.filter((_, i) => i !== index));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!title.trim() || isSubmitting) return;
+
+    setIsSubmitting(true);
+    
+    const success = await onSave({
       title: title.trim(),
       organization: organization.trim(),
       period: period.trim(),
@@ -116,12 +138,17 @@ export function ExperienceFormDialog({
       description: description.trim(),
       type,
       tags,
-      image: image.trim(),
+      image: images.length > 0 ? images[0] : image.trim(),
+      images: images,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       sortOrder: parseInt(sortOrder) || 0,
     } as any);
 
-    onOpenChange(false);
+    setIsSubmitting(false);
+    
+    if (success) {
+      onOpenChange(false);
+    }
   };
 
   return (
@@ -187,39 +214,112 @@ export function ExperienceFormDialog({
           </div>
 
           {/* Section 2: Time & Sorting */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 bg-muted/30 rounded-lg border border-border/50">
-            <div className="space-y-2">
-              <Label htmlFor="exp-period">Display Period</Label>
-              <Input
-                id="exp-period"
-                placeholder="e.g. Jun 2025 - Present"
-                value={period}
-                onChange={e => setPeriod(e.target.value)}
-              />
+          <div className="space-y-4 p-4 bg-muted/30 rounded-lg border border-border/50">
+            <div className="flex items-center gap-2 pb-2 border-b border-border/50">
+              <ArrowUpDown className="w-4 h-4 text-muted-foreground" />
+              <span className="text-sm font-medium">Pengaturan Waktu & Urutan</span>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="exp-start">Start Date (For Sorting)</Label>
-              <Input
-                id="exp-start"
-                type="month"
-                value={startDate}
-                onChange={e => setStartDate(e.target.value)}
-              />
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Display Period */}
+              <div className="space-y-2">
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Label htmlFor="exp-period" className="flex items-center gap-1.5 cursor-help">
+                        Display Period 
+                        <Info className="w-3.5 h-3.5 text-muted-foreground" />
+                      </Label>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="max-w-xs">
+                      <p className="text-xs">
+                        <strong>Teks yang ditampilkan</strong> di kartu pengalaman. 
+                        Contoh: "Jun 2025 - Present" atau "2022 - 2024"
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+                <Input
+                  id="exp-period"
+                  placeholder="e.g. Jun 2025 - Present"
+                  value={period}
+                  onChange={e => setPeriod(e.target.value)}
+                />
+                <p className="text-[10px] text-muted-foreground">
+                  Teks bebas untuk ditampilkan ke pengguna
+                </p>
+              </div>
+
+              {/* Start Date for Sorting */}
+              <div className="space-y-2">
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Label htmlFor="exp-start" className="flex items-center gap-1.5 cursor-help">
+                        Start Date (Untuk Urutan)
+                        <Info className="w-3.5 h-3.5 text-muted-foreground" />
+                      </Label>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="max-w-xs">
+                      <p className="text-xs">
+                        <strong>Tanggal asli</strong> untuk mengurutkan pengalaman. 
+                        Pilih bulan & tahun dimulainya pengalaman ini.
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+                <Input
+                  id="exp-start"
+                  type="month"
+                  value={startDate}
+                  onChange={e => setStartDate(e.target.value)}
+                />
+                <p className="text-[10px] text-muted-foreground">
+                  Tanggal asli untuk sorting otomatis
+                </p>
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="exp-order" className="flex items-center gap-1">
-                Prioritas Urutan
-              </Label>
-              <Input
-                id="exp-order"
-                type="number"
-                placeholder="0"
-                value={sortOrder}
-                onChange={e => setSortOrder(e.target.value)}
-              />
-              <p className="text-[10px] text-muted-foreground leading-tight mt-1">
-                Makin besar angka, makin di atas posisinya.
-              </p>
+
+            {/* Priority */}
+            <div className="space-y-3 pt-2">
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Label className="flex items-center gap-1.5 cursor-help">
+                      <Star className="w-4 h-4 text-amber-500" />
+                      Prioritas Utama
+                      <Info className="w-3.5 h-3.5 text-muted-foreground" />
+                    </Label>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="max-w-xs">
+                    <p className="text-xs">
+                      Tentukan pengalaman mana yang ingin ditampilkan lebih awal dalam tahun yang sama.
+                      Pilih <strong>Utama</strong> untuk pengalaman terbaik/paling penting.
+                    </p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+              
+              <div className="flex gap-2">
+                {[
+                  { value: '0', label: 'Normal', color: 'bg-muted text-muted-foreground border-border hover:bg-muted/80' },
+                  { value: '1', label: 'Utama', color: 'bg-amber-500/10 text-amber-600 border-amber-500/30 hover:bg-amber-500/20' },
+                  { value: '2', label: 'Sangat Utama', color: 'bg-amber-500/20 text-amber-700 border-amber-500/50 hover:bg-amber-500/30' },
+                ].map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => setSortOrder(option.value)}
+                    className={`flex-1 py-2.5 px-3 rounded-lg border-2 text-sm font-medium transition-all ${
+                      sortOrder === option.value
+                        ? option.color + ' ring-2 ring-primary/30'
+                        : 'bg-background border-border text-muted-foreground hover:bg-muted/50'
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 
@@ -242,12 +342,53 @@ export function ExperienceFormDialog({
               
             </div>
 
-            <ImageUploadField
-              label="Cover Image"
-              id="exp-image"
-              value={image}
-              onChange={setImage}
-            />
+            <div className="space-y-2">
+              <Label>Images (Gallery)</Label>
+              <p className="text-xs text-muted-foreground">Add multiple images. Click on an image to preview in lightbox.</p>
+              
+              {/* Existing Images Grid */}
+              {images.length > 0 && (
+                <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 mb-3">
+                  {images.map((img, index) => (
+                    <div key={index} className="relative group aspect-video rounded-lg overflow-hidden border border-border">
+                      <img 
+                        src={img} 
+                        alt={`Image ${index + 1}`} 
+                        className="w-full h-full object-cover"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveImage(index)}
+                        className="absolute top-1 right-1 bg-destructive text-destructive-foreground rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                      {index === 0 && (
+                        <span className="absolute bottom-1 left-1 text-[10px] bg-primary text-primary-foreground px-1.5 py-0.5 rounded">
+                          Cover
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Add More Images */}
+              <div className="flex gap-2">
+                <ImageUploadField
+                  label=""
+                  id="exp-image-add"
+                  value=""
+                  onChange={(val) => {
+                    if (val) handleAddImage(val);
+                  }}
+                  className="flex-1"
+                />
+              </div>
+              <p className="text-[10px] text-muted-foreground">
+                First image will be used as cover. Click to add more images.
+              </p>
+            </div>
 
             <div className="space-y-2">
               <Label>Tags / Skills</Label>
@@ -282,11 +423,20 @@ export function ExperienceFormDialog({
           </div>
 
           <DialogFooter className="pt-4 border-t border-border/50">
-            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
+            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
               Cancel
             </Button>
-            <Button type="submit" disabled={!title.trim()} className="min-w-[120px]">
-              {isEditing ? 'Save Changes' : 'Add Experience'}
+            <Button type="submit" disabled={!title.trim() || isSubmitting} className="min-w-[120px]">
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Saving...
+                </>
+              ) : isEditing ? (
+                'Save Changes'
+              ) : (
+                'Add Experience'
+              )}
             </Button>
           </DialogFooter>
         </form>

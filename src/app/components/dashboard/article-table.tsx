@@ -28,8 +28,9 @@ import {
   AlertDialogTitle,
 } from '../ui/alert-dialog';
 import type { Post } from '../../lib/types';
-import { deletePost, updatePost } from '../../lib/store';
+import { deletePostInDb, updatePostInDb } from '../../lib/db';
 import { format } from 'date-fns';
+import { toast } from 'sonner';
 
 interface ArticleTableProps {
   posts: Post[];
@@ -41,18 +42,28 @@ export function ArticleTable({ posts, onRefresh }: ArticleTableProps) {
   const [editingDateId, setEditingDateId] = useState<string | null>(null);
   const [editingDate, setEditingDate] = useState<string>('');
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (deleteId) {
-      deletePost(deleteId);
+      const result = await deletePostInDb(deleteId);
+      if (result) {
+        toast.success('Post deleted');
+      } else {
+        toast.error('Failed to delete post');
+      }
       setDeleteId(null);
       onRefresh();
     }
   };
 
-  const toggleStatus = (post: Post) => {
-    updatePost(post.id, {
+  const toggleStatus = async (post: Post) => {
+    const result = await updatePostInDb(post.id, {
       status: post.status === 'published' ? 'draft' : 'published',
     });
+    if (result) {
+      toast.success(result.status === 'published' ? 'Post published' : 'Post moved to drafts');
+    } else {
+      toast.error('Failed to update status');
+    }
     onRefresh();
   };
 
@@ -61,11 +72,16 @@ export function ArticleTable({ posts, onRefresh }: ArticleTableProps) {
     setEditingDate(post.created_at.split('T')[0]);
   };
 
-  const handleSaveDate = () => {
+  const handleSaveDate = async () => {
     if (editingDateId && editingDate) {
-      updatePost(editingDateId, {
+      const result = await updatePostInDb(editingDateId, {
         created_at: new Date(editingDate).toISOString(),
       });
+      if (result) {
+        toast.success('Date updated');
+      } else {
+        toast.error('Failed to update date');
+      }
       setEditingDateId(null);
       onRefresh();
     }

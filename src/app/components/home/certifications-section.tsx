@@ -1,16 +1,26 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { Award, ExternalLink, Calendar, ShieldCheck, BadgeCheck, Hash, Layers } from 'lucide-react';
 import { Badge } from '../ui/badge';
-import { getAllCertifications } from '../../lib/store';
+import { getAllCertificationsFromDb } from '../../lib/db';
 import type { Certification } from '../../lib/types';
 
 /* ── Helpers ── */
 function formatDate(dateStr: string): string {
   if (!dateStr) return '';
   const [year, month] = dateStr.split('-');
+  if (!month) return year;
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   return `${months[parseInt(month, 10) - 1]} ${year}`;
+}
+
+function isExpired(expiryDate: string): boolean {
+  if (!expiryDate) return false;
+  const now = new Date();
+  const [year, month] = expiryDate.split('-');
+  if (!month) return false;
+  const expiry = new Date(parseInt(year), parseInt(month) - 1);
+  return expiry < now;
 }
 
 /* ═══════════════════════════════════════════
@@ -28,11 +38,15 @@ function MobileCertCard({ cert }: { cert: Certification }) {
         </p>
         <p className="text-xs text-muted-foreground line-clamp-1">{cert.organization}</p>
         <div className="flex items-center gap-2 mt-1">
-          <span className="text-[11px] text-muted-foreground/70">{formatDate(cert.issueDate)}</span>
-          {!cert.expiryDate && (
+          <span className="text-[11px] text-muted-foreground/70">{formatDate(cert.issueDate) || 'N/A'}</span>
+          {!cert.expiryDate || !isExpired(cert.expiryDate) ? (
             <span className="inline-flex items-center gap-0.5 text-[10px] text-emerald-500">
               <BadgeCheck className="w-2.5 h-2.5" />
               Active
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-0.5 text-[10px] text-red-500">
+              Expired
             </span>
           )}
         </div>
@@ -65,7 +79,7 @@ function CertFlipCard({ cert, index }: { cert: Certification; index: number }) {
       initial={{ opacity: 0, y: 30 }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, margin: '-30px' }}
-      transition={{ duration: 0.45, delay: index * 0.06, ease: [0.25, 0.46, 0.45, 0.94] }}
+      transition={{ duration: 0.45, delay: index * 0.06, ease: [0.25, 0.46, 0.45, 0.94] as const }}
       className="relative w-full aspect-[4/3] cursor-pointer select-none"
       style={{ perspective: '900px' }}
       onMouseEnter={() => setIsFlipped(true)}
@@ -100,15 +114,14 @@ function CertFlipCard({ cert, index }: { cert: Certification; index: number }) {
           </div>
 
           <div className="absolute top-2.5 right-2.5 z-10">
-            {!cert.expiryDate ? (
+            {(!cert.expiryDate || !isExpired(cert.expiryDate)) ? (
               <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] bg-emerald-500/20 text-emerald-300 backdrop-blur-md border border-emerald-500/25">
                 <BadgeCheck className="w-2.5 h-2.5" />
                 Active
               </span>
             ) : (
-              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] bg-white/10 text-white/60 backdrop-blur-md border border-white/15">
-                <Calendar className="w-2.5 h-2.5" />
-                {formatDate(cert.expiryDate)}
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] bg-red-500/20 text-red-300 backdrop-blur-md border border-red-500/25">
+                Expired
               </span>
             )}
           </div>
@@ -158,7 +171,12 @@ function CertFlipCard({ cert, index }: { cert: Certification; index: number }) {
 
               <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground/60 mb-1">
                 <Calendar className="w-2.5 h-2.5 shrink-0" />
-                <span>Issued {formatDate(cert.issueDate)}</span>
+                <span>Issued {formatDate(cert.issueDate) || 'N/A'}</span>
+                {cert.expiryDate && (
+                  <span className={isExpired(cert.expiryDate) ? 'text-red-500' : ''}>
+                    {' '} · Exp. {formatDate(cert.expiryDate)}
+                  </span>
+                )}
               </div>
 
               {cert.credentialId && (
@@ -210,7 +228,38 @@ function CertFlipCard({ cert, index }: { cert: Certification; index: number }) {
 
 /* ── Section ── */
 export function CertificationsSection() {
-  const [certifications] = useState(getAllCertifications);
+  const [certifications, setCertifications] = useState<Certification[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadCertifications() {
+      const data = await getAllCertificationsFromDb();
+      setCertifications(data);
+      setLoading(false);
+    }
+    loadCertifications();
+  }, []);
+
+  if (loading) {
+    return (
+      <section className="py-16 md:py-24">
+        <div className="max-w-6xl mx-auto px-6">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.5 }}
+            className="text-center mb-8 md:mb-12"
+          >
+            <span className="text-primary text-sm tracking-widest uppercase">Sertifikasi</span>
+            <h2 className="!text-2xl sm:!text-3xl md:!text-4xl text-foreground mt-3">
+              Licenses & Certifications
+            </h2>
+          </motion.div>
+        </div>
+      </section>
+    );
+  }
 
   if (certifications.length === 0) return null;
 

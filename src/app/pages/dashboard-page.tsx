@@ -1,15 +1,34 @@
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { Link } from 'react-router';
 import { motion } from 'motion/react';
 import { FileText, Eye, PenSquare, Clock, Sparkles, CalendarDays, Briefcase, FolderKanban, Award, ArrowRight } from 'lucide-react';
 import { Button } from '../components/ui/button';
-import { getAllPosts, getAllExperiences, getAllProjects, getAllCertifications } from '../lib/store';
+import { getAllPostsFromDb, getAllExperiencesFromDb, getAllProjectsFromDb, getAllCertificationsFromDb } from '../lib/db';
+import type { Post, Experience, Project, Certification } from '../lib/types';
 
 export function DashboardPage() {
-  const posts = useMemo(() => getAllPosts(), []);
-  const experiences = useMemo(() => getAllExperiences(), []);
-  const projects = useMemo(() => getAllProjects(), []);
-  const certifications = useMemo(() => getAllCertifications(), []);
+  const [posts, setPosts] = useState<Post[]>([]);
+  const [experiences, setExperiences] = useState<Experience[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [certifications, setCertifications] = useState<Certification[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadData() {
+      const [postsData, experiencesData, projectsData, certificationsData] = await Promise.all([
+        getAllPostsFromDb(),
+        getAllExperiencesFromDb(),
+        getAllProjectsFromDb(),
+        getAllCertificationsFromDb()
+      ]);
+      setPosts(postsData);
+      setExperiences(experiencesData);
+      setProjects(projectsData);
+      setCertifications(certificationsData);
+      setLoading(false);
+    }
+    loadData();
+  }, []);
 
   const stats = useMemo(() => {
     const published = posts.filter(p => p.status === 'published').length;
@@ -34,6 +53,28 @@ export function DashboardPage() {
   const mobileStats = allStats.slice(0, 4);
 
   const recentPosts = posts.slice(0, 5);
+
+  if (loading) {
+    return (
+      <div>
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3 }}
+        >
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 md:mb-8">
+            <div>
+              <h1 className="!text-xl md:!text-2xl text-foreground">Dashboard</h1>
+              <p className="text-muted-foreground text-sm mt-1">Welcome back, Api!</p>
+            </div>
+          </div>
+          <div className="flex items-center justify-center py-20">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          </div>
+        </motion.div>
+      </div>
+    );
+  }
 
   return (
     <div>

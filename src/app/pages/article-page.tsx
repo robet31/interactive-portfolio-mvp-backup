@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useRef, useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router';
 import { motion } from 'motion/react';
 import { ArrowLeft, Calendar } from 'lucide-react';
@@ -6,15 +6,47 @@ import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
 import { ArticleRenderer } from '../components/blog/article-renderer';
 import { TableOfContents } from '../components/blog/table-of-contents';
-import { getPostBySlug, getPublishedPosts } from '../lib/store';
+import { getPostBySlugFromDb, getPublishedPostsFromDb } from '../lib/db';
 import { BlogCard } from '../components/blog/blog-card';
 import { ImageWithFallback } from '../components/figma/ImageWithFallback';
 import { format } from 'date-fns';
+import type { Post } from '../lib/types';
 
 export function ArticlePage() {
   const { slug } = useParams();
-  const post = slug ? getPostBySlug(slug) : undefined;
+  const [post, setPost] = useState<Post | undefined>(undefined);
+  const [relatedPosts, setRelatedPosts] = useState<Post[]>([]);
+  const [loading, setLoading] = useState(true);
   const articleRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    async function loadData() {
+      if (slug) {
+        const postData = await getPostBySlugFromDb(slug);
+        setPost(postData);
+        
+        if (postData) {
+          const allPosts = await getPublishedPostsFromDb();
+          const related = allPosts
+            .filter(p => p.id !== postData.id && p.category === postData.category)
+            .slice(0, 2);
+          setRelatedPosts(related);
+        }
+      }
+      setLoading(false);
+    }
+    loadData();
+  }, [slug]);
+
+  if (loading) {
+    return (
+      <div className="pt-24 pb-16 min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+        </div>
+      </div>
+    );
+  }
 
   if (!post) {
     return (
@@ -32,10 +64,6 @@ export function ArticlePage() {
       </div>
     );
   }
-
-  const relatedPosts = getPublishedPosts()
-    .filter(p => p.id !== post.id && p.category === post.category)
-    .slice(0, 2);
 
   return (
     <div className="pt-24 pb-16">

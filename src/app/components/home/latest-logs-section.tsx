@@ -1,21 +1,56 @@
-import { useMemo } from 'react';
+import { useMemo, useEffect, useState } from 'react';
 import { Link } from 'react-router';
 import { motion } from 'motion/react';
 import { ArrowRight, Clock, Terminal, CalendarDays } from 'lucide-react';
 import { Button } from '../ui/button';
-import { getPublishedPosts } from '../../lib/store';
+import { getPublishedPostsFromDb } from '../../lib/db';
 import { format } from 'date-fns';
+import type { Post } from '../../lib/types';
 
 export function LatestLogsSection() {
+  const [posts, setPosts] = useState<Post[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadPosts() {
+      const data = await getPublishedPostsFromDb();
+      setPosts(data);
+      setLoading(false);
+    }
+    loadPosts();
+  }, []);
+
   const logs = useMemo(() => {
-    return getPublishedPosts()
+    return posts
       .filter((p) => p.category === 'Daily Log')
       .sort(
         (a, b) =>
           new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       )
       .slice(0, 5);
-  }, []);
+  }, [posts]);
+
+  if (loading) {
+    return (
+      <section className="py-16 md:py-20 border-t border-border/40">
+        <div className="max-w-6xl mx-auto px-6">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.5 }}
+            className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8 md:mb-10"
+          >
+            <div>
+              <h2 className="!text-2xl sm:!text-3xl md:!text-4xl text-foreground mb-2">
+                Log Harian
+              </h2>
+            </div>
+          </motion.div>
+        </div>
+      </section>
+    );
+  }
 
   if (logs.length === 0) return null;
 

@@ -1,134 +1,326 @@
 import type { Post, Experience, Project, Certification } from './types';
 
-const NEON_CONNECTION_STRING = 'postgresql://neondb_owner:npg_UEO9PQLoANd7@ep-jolly-king-aj803ozy-pooler.c-3.us-east-2.aws.neon.tech/neondb?channel_binding=require&sslmode=require';
+const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
-interface NeonRow {
-  [key: string]: unknown;
+async function fetchFromApi<T>(endpoint: string, options?: RequestInit): Promise<T> {
+  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options?.headers,
+    },
+  });
+  if (!response.ok) {
+    throw new Error(`API Error: ${response.statusText}`);
+  }
+  return response.json();
 }
 
-async function queryNeon<T>(sql: string, params: unknown[] = []): Promise<T[]> {
+export async function getAllPostsFromDb(): Promise<Post[]> {
   try {
-    const response = await fetch('https://neon-proxy.opencode.workers.dev/query', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        connectionString: NEON_CONNECTION_STRING,
-        sql,
-        params
-      })
-    });
-
-    if (!response.ok) {
-      throw new Error(`Query failed: ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    return data as T[];
+    const rows = await fetchFromApi<Post[]>('/posts');
+    return rows.map(row => ({
+      id: String(row.id),
+      title: row.title,
+      slug: row.slug,
+      content: row.content || '',
+      cover_image_url: row.cover_image_url || '',
+      category: row.category || 'Jurnal & Catatan',
+      status: row.status || 'draft',
+      excerpt: row.excerpt || '',
+      created_at: row.created_at,
+      updated_at: row.updated_at,
+      reading_time: Number(row.reading_time) || 0,
+    }));
   } catch (error) {
-    console.error('Neon query error:', error);
+    console.error('Error fetching posts:', error);
     return [];
   }
 }
 
-export async function getAllPostsFromDb(): Promise<Post[]> {
-  const rows = await queryNeon<NeonRow>(
-    'SELECT id, title, slug, content, cover_image_url, category, status, excerpt, created_at, updated_at, reading_time FROM posts ORDER BY created_at DESC'
-  );
-  
-  return rows.map(row => ({
-    id: row.id as string,
-    title: row.title as string,
-    slug: row.slug as string,
-    content: row.content as string || '',
-    cover_image_url: row.cover_image_url as string || '',
-    category: row.category as Post['category'],
-    status: row.status as 'draft' | 'published',
-    excerpt: row.excerpt as string || '',
-    created_at: row.created_at as string,
-    updated_at: row.updated_at as string,
-    reading_time: row.reading_time as number || 0,
-  }));
-}
-
 export async function getPublishedPostsFromDb(): Promise<Post[]> {
-  const posts = await getAllPostsFromDb();
-  return posts.filter(p => p.status === 'published');
+  try {
+    const rows = await fetchFromApi<Post[]>('/posts/published');
+    return rows.map(row => ({
+      id: String(row.id),
+      title: row.title,
+      slug: row.slug,
+      content: row.content || '',
+      cover_image_url: row.cover_image_url || '',
+      category: row.category || 'Jurnal & Catatan',
+      status: row.status || 'draft',
+      excerpt: row.excerpt || '',
+      created_at: row.created_at,
+      updated_at: row.updated_at,
+      reading_time: Number(row.reading_time) || 0,
+    }));
+  } catch (error) {
+    console.error('Error fetching published posts:', error);
+    return [];
+  }
 }
 
 export async function getPostBySlugFromDb(slug: string): Promise<Post | undefined> {
-  const rows = await queryNeon<NeonRow>(
-    'SELECT * FROM posts WHERE slug = $1',
-    [slug]
-  );
-  
-  if (rows.length === 0) return undefined;
-  
-  const row = rows[0];
-  return {
-    id: row.id as string,
-    title: row.title as string,
-    slug: row.slug as string,
-    content: row.content as string || '',
-    cover_image_url: row.cover_image_url as string || '',
-    category: row.category as Post['category'],
-    status: row.status as 'draft' | 'published',
-    excerpt: row.excerpt as string || '',
-    created_at: row.created_at as string,
-    updated_at: row.updated_at as string,
-    reading_time: row.reading_time as number || 0,
-  };
+  try {
+    const row = await fetchFromApi<Post>(`/posts/${slug}`);
+    return {
+      id: String(row.id),
+      title: row.title,
+      slug: row.slug,
+      content: row.content || '',
+      cover_image_url: row.cover_image_url || '',
+      category: row.category || 'Jurnal & Catatan',
+      status: row.status || 'draft',
+      excerpt: row.excerpt || '',
+      created_at: row.created_at,
+      updated_at: row.updated_at,
+      reading_time: Number(row.reading_time) || 0,
+    };
+  } catch (error) {
+    console.error('Error fetching post by slug:', error);
+    return undefined;
+  }
+}
+
+interface ApiExperience {
+  id: number;
+  title: string;
+  organization: string;
+  period: string;
+  description: string;
+  type: string;
+  image: string;
+  start_date: string;
+  tags: string[];
 }
 
 export async function getAllExperiencesFromDb(): Promise<Experience[]> {
-  const rows = await queryNeon<NeonRow>(
-    'SELECT id, title, organization, period, description, type, image, start_date FROM experiences ORDER BY start_date DESC'
-  );
-  
-  return rows.map(row => ({
-    id: row.id as string,
-    title: row.title as string,
-    organization: row.organization as string,
-    period: row.period as string,
-    description: row.description as string || '',
-    tags: (row.tags as string[]) || [],
-    type: row.type as Experience['type'],
-    image: row.image as string || '',
-    startDate: row.start_date as string || '',
-  }));
+  try {
+    const rows = await fetchFromApi<ApiExperience[]>('/experiences');
+    return rows.map(row => ({
+      id: String(row.id),
+      title: row.title,
+      organization: row.organization || '',
+      period: row.period || '',
+      description: row.description || '',
+      tags: Array.isArray(row.tags) ? row.tags : [],
+      type: (row.type as Experience['type']) || 'work',
+      image: row.image || '',
+      images: Array.isArray(row.images) ? row.images : [],
+      startDate: row.start_date || '',
+    }));
+  } catch (error) {
+    console.error('Error fetching experiences:', error);
+    return [];
+  }
+}
+
+interface ApiProject {
+  id: number;
+  title: string;
+  description: string;
+  image: string;
+  tags: string[];
+  link: string;
+  category: string;
 }
 
 export async function getAllProjectsFromDb(): Promise<Project[]> {
-  const rows = await queryNeon<NeonRow>(
-    'SELECT id, title, description, image, tags, link, category FROM projects'
-  );
-  
-  return rows.map(row => ({
-    id: row.id as string,
-    title: row.title as string,
-    description: row.description as string || '',
-    image: row.image as string || '',
-    tags: (row.tags as string[]) || [],
-    link: row.link as string || '',
-    category: row.category as string || '',
-  }));
+  try {
+    const rows = await fetchFromApi<ApiProject[]>('/projects');
+    return rows.map(row => ({
+      id: String(row.id),
+      title: row.title,
+      description: row.description || '',
+      image: row.image || '',
+      tags: Array.isArray(row.tags) ? row.tags : [],
+      link: row.link || '',
+      category: row.category || '',
+    }));
+  } catch (error) {
+    console.error('Error fetching projects:', error);
+    return [];
+  }
+}
+
+interface ApiCertification {
+  id: number;
+  name: string;
+  organization: string;
+  issue_date: string;
+  expiry_date: string;
+  credential_id: string;
+  credential_url: string;
+  image: string;
+  skills: string[];
 }
 
 export async function getAllCertificationsFromDb(): Promise<Certification[]> {
-  const rows = await queryNeon<NeonRow>(
-    'SELECT id, name, organization, issue_date, expiry_date, credential_id, credential_url, image, skills FROM certifications'
-  );
-  
-  return rows.map(row => ({
-    id: row.id as string,
-    name: row.name as string,
-    organization: row.organization as string,
-    issueDate: row.issue_date as string,
-    expiryDate: row.expiry_date as string || '',
-    credentialId: row.credential_id as string || '',
-    credentialUrl: row.credential_url as string || '',
-    image: row.image as string || '',
-    skills: (row.skills as string[]) || [],
-  }));
+  try {
+    const rows = await fetchFromApi<ApiCertification[]>('/certifications');
+    return rows.map(row => ({
+      id: String(row.id),
+      name: row.name,
+      organization: row.organization,
+      issueDate: row.issue_date || '',
+      expiryDate: row.expiry_date || '',
+      credentialId: row.credential_id || '',
+      credentialUrl: row.credential_url || '',
+      image: row.image || '',
+      skills: Array.isArray(row.skills) ? row.skills : [],
+    }));
+  } catch (error) {
+    console.error('Error fetching certifications:', error);
+    return [];
+  }
+}
+
+// ==================== CRUD FUNCTIONS ====================
+
+// Posts CRUD
+export async function createPostInDb(data: Partial<Post>): Promise<Post | null> {
+  try {
+    const result = await fetchFromApi<Post>('/posts', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+    return result;
+  } catch (error) {
+    console.error('Error creating post:', error);
+    return null;
+  }
+}
+
+export async function updatePostInDb(id: string, data: Partial<Post>): Promise<Post | null> {
+  try {
+    const result = await fetchFromApi<Post>(`/posts/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+    return result;
+  } catch (error) {
+    console.error('Error updating post:', error);
+    return null;
+  }
+}
+
+export async function deletePostInDb(id: string): Promise<boolean> {
+  try {
+    await fetchFromApi(`/posts/${id}`, { method: 'DELETE' });
+    return true;
+  } catch (error) {
+    console.error('Error deleting post:', error);
+    return false;
+  }
+}
+
+// Experiences CRUD
+export async function createExperienceInDb(data: Partial<Experience>): Promise<Experience | null> {
+  try {
+    const result = await fetchFromApi<Experience>('/experiences', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+    return result;
+  } catch (error) {
+    console.error('Error creating experience:', error);
+    return null;
+  }
+}
+
+export async function updateExperienceInDb(id: string, data: Partial<Experience>): Promise<Experience | null> {
+  try {
+    const result = await fetchFromApi<Experience>(`/experiences/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+    return result;
+  } catch (error) {
+    console.error('Error updating experience:', error);
+    return null;
+  }
+}
+
+export async function deleteExperienceInDb(id: string): Promise<boolean> {
+  try {
+    await fetchFromApi(`/experiences/${id}`, { method: 'DELETE' });
+    return true;
+  } catch (error) {
+    console.error('Error deleting experience:', error);
+    return false;
+  }
+}
+
+// Projects CRUD
+export async function createProjectInDb(data: Partial<Project>): Promise<Project | null> {
+  try {
+    const result = await fetchFromApi<Project>('/projects', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+    return result;
+  } catch (error) {
+    console.error('Error creating project:', error);
+    return null;
+  }
+}
+
+export async function updateProjectInDb(id: string, data: Partial<Project>): Promise<Project | null> {
+  try {
+    const result = await fetchFromApi<Project>(`/projects/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+    return result;
+  } catch (error) {
+    console.error('Error updating project:', error);
+    return null;
+  }
+}
+
+export async function deleteProjectInDb(id: string): Promise<boolean> {
+  try {
+    await fetchFromApi(`/projects/${id}`, { method: 'DELETE' });
+    return true;
+  } catch (error) {
+    console.error('Error deleting project:', error);
+    return false;
+  }
+}
+
+// Certifications CRUD
+export async function createCertificationInDb(data: Partial<Certification>): Promise<Certification | null> {
+  try {
+    const result = await fetchFromApi<Certification>('/certifications', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+    return result;
+  } catch (error) {
+    console.error('Error creating certification:', error);
+    return null;
+  }
+}
+
+export async function updateCertificationInDb(id: string, data: Partial<Certification>): Promise<Certification | null> {
+  try {
+    const result = await fetchFromApi<Certification>(`/certifications/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+    return result;
+  } catch (error) {
+    console.error('Error updating certification:', error);
+    return null;
+  }
+}
+
+export async function deleteCertificationInDb(id: string): Promise<boolean> {
+  try {
+    await fetchFromApi(`/certifications/${id}`, { method: 'DELETE' });
+    return true;
+  } catch (error) {
+    console.error('Error deleting certification:', error);
+    return false;
+  }
 }

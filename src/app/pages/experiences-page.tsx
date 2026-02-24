@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Plus,
@@ -13,6 +13,8 @@ import {
   Heart,
   Users,
   ArrowUpDown,
+  Star,
+  Image,
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -34,12 +36,13 @@ import {
 } from '../components/ui/dialog';
 import { ImageWithFallback } from '../components/figma/ImageWithFallback';
 import { ExperienceFormDialog } from '../components/dashboard/experience-form-dialog';
+import { ImageLightbox, ImageGalleryGrid } from '../components/ui/image-lightbox';
 import {
-  getAllExperiences,
-  createExperience,
-  updateExperience,
-  deleteExperience,
-} from '../lib/store';
+  getAllExperiencesFromDb,
+  createExperienceInDb,
+  updateExperienceInDb,
+  deleteExperienceInDb,
+} from '../lib/db';
 import type { Experience } from '../lib/types';
 import { toast } from 'sonner';
 
@@ -80,6 +83,7 @@ function extractYear(exp: Experience): string {
   if (exp.startDate) {
     return exp.startDate.split('-')[0];
   }
+  if (!exp.period) return 'Unknown';
   const match = exp.period.match(/\d{4}/);
   return match ? match[0] : 'Unknown';
 }
@@ -94,71 +98,112 @@ function ExperienceCard({
   onEdit: () => void;
   onDelete: () => void;
 }) {
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState(0);
   const Icon = typeIcon[exp.type] || Briefcase;
   const currentSortOrder = exp.sortOrder ?? 0;
 
+  // Get images array
+  const images = exp.images && exp.images.length > 0 
+    ? exp.images 
+    : exp.image 
+      ? [exp.image] 
+      : [];
+
+  const handleImageClick = (index: number) => {
+    setLightboxIndex(index);
+    setLightboxOpen(true);
+  };
+
   return (
-    <motion.div
-      initial={{ opacity: 0, scale: 0.98 }}
-      animate={{ opacity: 1, scale: 1 }}
-      className="flex flex-col sm:flex-row items-start sm:items-center gap-4 p-4 rounded-xl border border-border/50 bg-card hover:border-primary/30 transition-all group"
-    >
-      {/* Kiri: Icon / Gambar */}
-      {exp.image ? (
-        <div className="w-16 h-16 rounded-lg overflow-hidden shrink-0 border border-border">
-          <ImageWithFallback
-            src={exp.image}
-            alt={exp.title}
-            className="w-full h-full object-cover"
-          />
-        </div>
-      ) : (
-        <div className={`w-16 h-16 rounded-lg flex items-center justify-center shrink-0 border border-border/50 ${typeColor[exp.type]}`}>
-          <Icon className="w-6 h-6" />
-        </div>
-      )}
-
-      {/* Tengah: Info */}
-      <div className="flex-1 min-w-0">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-4">
-          <div>
-            <h3 className="text-foreground font-semibold truncate group-hover:text-primary transition-colors">
-              {exp.title}
-            </h3>
-            <p className="text-muted-foreground text-sm truncate">{exp.organization}</p>
+    <>
+      <motion.div
+        initial={{ opacity: 0, scale: 0.98 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="flex flex-col sm:flex-row items-start sm:items-center gap-4 p-4 rounded-xl border border-border/50 bg-card hover:border-primary/30 transition-all group"
+      >
+        {/* Kiri: Icon / Gambar */}
+        {images.length > 0 ? (
+          <div 
+            className="w-16 h-16 rounded-lg overflow-hidden shrink-0 border border-border cursor-pointer"
+            onClick={() => handleImageClick(0)}
+          >
+            <ImageWithFallback
+              src={images[0]}
+              alt={exp.title}
+              className="w-full h-full object-cover"
+            />
           </div>
+        ) : (
+          <div className={`w-16 h-16 rounded-lg flex items-center justify-center shrink-0 border border-border/50 ${typeColor[exp.type]}`}>
+            <Icon className="w-6 h-6" />
+          </div>
+        )}
 
-          <div className="flex items-center gap-2 mt-2 sm:mt-0 shrink-0">
-            {/* Indikator Prioritas (Sort Order) */}
-            {currentSortOrder > 0 && (
-              <Badge variant="outline" className="text-[10px] bg-primary/5 border-primary/20 text-primary">
-                <ArrowUpDown className="w-3 h-3 mr-1" />
-                Priority: {currentSortOrder}
+        {/* Tengah: Info */}
+        <div className="flex-1 min-w-0">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-4">
+            <div>
+              <h3 className="text-foreground font-semibold truncate group-hover:text-primary transition-colors">
+                {exp.title}
+              </h3>
+              <p className="text-muted-foreground text-sm truncate">{exp.organization}</p>
+            </div>
+
+            <div className="flex items-center gap-2 mt-2 sm:mt-0 shrink-0">
+              {/* Indikator Prioritas (Sort Order) */}
+              {currentSortOrder === 2 && (
+                <Badge className="text-[10px] bg-amber-500/20 text-amber-700 border-amber-500/40 shrink-0">
+                  <Star className="w-3 h-3 mr-1 fill-amber-500" />
+                  Sangat Utama
+                </Badge>
+              )}
+              {currentSortOrder === 1 && (
+                <Badge variant="outline" className="text-[10px] bg-amber-500/10 text-amber-600 border-amber-500/30 shrink-0">
+                  <Star className="w-3 h-3 mr-1" />
+                  Utama
+                </Badge>
+              )}
+              <Badge variant="secondary" className="text-xs shrink-0 hidden sm:inline-flex">
+                {exp.period || <span className="text-muted-foreground italic">No period</span>}
               </Badge>
-            )}
-            <Badge variant="secondary" className="text-xs shrink-0 hidden sm:inline-flex">
-              {exp.period}
-            </Badge>
+              {/* Image count indicator */}
+              {images.length > 1 && (
+                <Badge variant="outline" className="text-[10px] bg-primary/10 text-primary border-primary/30 shrink-0">
+                  <Image className="w-3 h-3 mr-1" />
+                  {images.length}
+                </Badge>
+              )}
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Kanan: Aksi Edit & Delete */}
-      <div className="flex items-center gap-2 w-full sm:w-auto mt-3 sm:mt-0 pt-3 sm:pt-0 border-t sm:border-0 border-border/50 shrink-0">
-        <Button variant="secondary" size="sm" className="flex-1 sm:flex-none h-8 px-3" onClick={onEdit}>
-          <Pencil className="w-3.5 h-3.5 sm:mr-1.5" />
-          <span className="hidden sm:inline">Edit</span>
-        </Button>
-        <Button variant="destructive" size="icon" className="h-8 w-8 shrink-0" onClick={onDelete}>
-          <Trash2 className="w-3.5 h-3.5" />
-        </Button>
-      </div>
-    </motion.div>
+        {/* Kanan: Aksi Edit & Delete */}
+        <div className="flex items-center gap-2 w-full sm:w-auto mt-3 sm:mt-0 pt-3 sm:pt-0 border-t sm:border-0 border-border/50 shrink-0">
+          <Button variant="secondary" size="sm" className="flex-1 sm:flex-none h-8 px-3" onClick={onEdit}>
+            <Pencil className="w-3.5 h-3.5 sm:mr-1.5" />
+            <span className="hidden sm:inline">Edit</span>
+          </Button>
+          <Button variant="destructive" size="icon" className="h-8 w-8 shrink-0" onClick={onDelete}>
+            <Trash2 className="w-3.5 h-3.5" />
+          </Button>
+        </div>
+      </motion.div>
+
+      {/* Lightbox */}
+      <ImageLightbox
+        images={images}
+        initialIndex={lightboxIndex}
+        open={lightboxOpen}
+        onOpenChange={setLightboxOpen}
+      />
+    </>
   );
 }
 
 export function ExperiencesPage() {
-  const [experiences, setExperiences] = useState<Experience[]>(getAllExperiences);
+  const [experiences, setExperiences] = useState<Experience[]>([]);
+  const [loading, setLoading] = useState(true);
   const [formOpen, setFormOpen] = useState(false);
   const [editingExp, setEditingExp] = useState<Experience | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -166,21 +211,43 @@ export function ExperiencesPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState<string>('all');
 
-  const refresh = useCallback(() => {
-    setExperiences(getAllExperiences());
+  const refresh = useCallback(async () => {
+    const data = await getAllExperiencesFromDb();
+    setExperiences(data);
+  }, []);
+
+  useEffect(() => {
+    async function load() {
+      const data = await getAllExperiencesFromDb();
+      setExperiences(data);
+      setLoading(false);
+    }
+    load();
   }, []);
 
   const handleSave = useCallback(
-    (data: Partial<Experience>) => {
+    async (data: Partial<Experience>): Promise<boolean> => {
+      let success = false;
       if (editingExp) {
-        updateExperience(editingExp.id, data);
-        toast.success('Experience updated!');
+        const result = await updateExperienceInDb(editingExp.id, data);
+        if (result) {
+          toast.success('Experience updated!');
+          success = true;
+        } else {
+          toast.error('Failed to update experience');
+        }
       } else {
-        createExperience(data);
-        toast.success('Experience added!');
+        const result = await createExperienceInDb(data);
+        if (result) {
+          toast.success('Experience added!');
+          success = true;
+        } else {
+          toast.error('Failed to add experience');
+        }
       }
       setEditingExp(null);
       refresh();
+      return success;
     },
     [editingExp, refresh],
   );
@@ -200,10 +267,14 @@ export function ExperiencesPage() {
     setDeleteDialogOpen(true);
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (deletingId) {
-      deleteExperience(deletingId);
-      toast.success('Experience deleted.');
+      const result = await deleteExperienceInDb(deletingId);
+      if (result) {
+        toast.success('Experience deleted.');
+      } else {
+        toast.error('Failed to delete experience');
+      }
       setDeleteDialogOpen(false);
       setDeletingId(null);
       refresh();

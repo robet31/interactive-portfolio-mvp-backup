@@ -128,7 +128,7 @@ export function Navbar() {
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
-            transition={{ duration: 0.25, ease: [0.25, 0.46, 0.45, 0.94] }}
+            transition={{ duration: 0.25, ease: [0.25, 0.46, 0.45, 0.94] as const }}
             className="md:hidden overflow-hidden bg-background/95 backdrop-blur-xl border-b border-border"
           >
             <div className="px-6 py-4 space-y-1.5">

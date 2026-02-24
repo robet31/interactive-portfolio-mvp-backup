@@ -1,24 +1,36 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { Link } from 'react-router';
 import { motion } from 'motion/react';
 import { CalendarDays, ArrowRight, Clock, Terminal, Search, ArrowLeft } from 'lucide-react';
 import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
-import { getPublishedPosts } from '../lib/store';
+import { getPublishedPostsFromDb } from '../lib/db';
 import { format } from 'date-fns';
+import type { Post } from '../lib/types';
 
 export function DailyLogsPage() {
   const [search, setSearch] = useState('');
+  const [posts, setPosts] = useState<Post[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadPosts() {
+      const data = await getPublishedPostsFromDb();
+      setPosts(data);
+      setLoading(false);
+    }
+    loadPosts();
+  }, []);
 
   const allLogs = useMemo(() => {
-    return getPublishedPosts()
+    return posts
       .filter((p) => p.category === 'Daily Log')
       .sort(
         (a, b) =>
           new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       );
-  }, []);
+  }, [posts]);
 
   const filteredLogs = useMemo(() => {
     if (!search.trim()) return allLogs;

@@ -27,9 +27,9 @@ import {
   SelectValue,
 } from '../components/ui/select';
 import { TipTapEditor } from '../components/dashboard/tiptap-editor';
-import { createPost, updatePost, getPostById } from '../lib/store';
+import { createPostInDb, updatePostInDb, getAllPostsFromDb } from '../lib/db';
 import { generateLogEntry } from '../lib/ai-service';
-import type { PostCategory } from '../lib/types';
+import type { PostCategory, Post } from '../lib/types';
 import { toast } from 'sonner';
 
 const CATEGORIES: PostCategory[] = [
@@ -357,15 +357,19 @@ ${hasExistingContent ? 'Kembangkan tulisan user yang sudah ada!' : 'Buat artikel
   }, [generateContent]);
 
   useEffect(() => {
-    if (isEditing) {
-      const post = getPostById(id);
-      if (post) {
-        setTitle(post.title);
-        setExcerpt(post.excerpt);
-        setCoverUrl(post.cover_image_url);
-        setCategory(post.category);
-        setContent(post.content);
+    if (isEditing && id) {
+      async function loadPost() {
+        const posts = await getAllPostsFromDb();
+        const post = posts.find(p => p.id === id);
+        if (post) {
+          setTitle(post.title);
+          setExcerpt(post.excerpt);
+          setCoverUrl(post.cover_image_url);
+          setCategory(post.category);
+          setContent(post.content);
+        }
       }
+      loadPost();
     }
   }, [id, isEditing]);
 
@@ -388,20 +392,30 @@ ${hasExistingContent ? 'Kembangkan tulisan user yang sudah ada!' : 'Buat artikel
 
     const data = {
       title,
+      slug: title.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-'),
       excerpt,
       cover_image_url: coverUrl,
       category,
       content,
       status,
+      reading_time: Math.max(1, Math.ceil(content.replace(/<[^>]*>/g, '').split(/\s+/).length / 200)),
     };
 
     if (isEditing) {
-      updatePost(id, data);
-      toast.success(status === 'published' ? 'Article published!' : 'Draft saved!');
+      const updated = await updatePostInDb(id, data);
+      if (updated) {
+        toast.success(status === 'published' ? 'Article published!' : 'Draft saved!');
+      } else {
+        toast.error('Failed to save article');
+      }
     } else {
-      const newPost = createPost(data);
-      toast.success(status === 'published' ? 'Article published!' : 'Draft saved!');
-      navigate(`/rapi/editor/${newPost.id}`, { replace: true });
+      const newPost = await createPostInDb(data);
+      if (newPost) {
+        toast.success(status === 'published' ? 'Article published!' : 'Draft saved!');
+        navigate(`/rapi/editor/${newPost.id}`, { replace: true });
+      } else {
+        toast.error('Failed to create article');
+      }
     }
 
     setSaving(false);

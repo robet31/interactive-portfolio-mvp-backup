@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Textarea } from '../components/ui/textarea';
-import { createPost } from '../lib/store';
+import { createPostInDb } from '../lib/db';
 import { generateLogEntry, LOG_TEMPLATES } from '../lib/ai-service';
 import type { ChatMessage } from '../lib/ai-service';
 import { toast } from 'sonner';
@@ -290,22 +290,26 @@ export function LogGeneratorPage() {
   };
 
   const handleSaveAsArticle = useCallback(
-    (html: string) => {
+    async (html: string) => {
       const titleMatch = html.match(/<h2[^>]*>(.*?)<\/h2>/);
       const title = titleMatch
         ? titleMatch[1].replace(/<[^>]*>/g, '')
         : `Daily Log - ${new Date().toLocaleDateString('id-ID')}`;
 
-      const newPost = createPost({
+      const newPost = await createPostInDb({
         title,
+        slug: title.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-'),
         content: html,
         category: 'Daily Log',
         status: 'draft',
         excerpt: `Log harian: ${title}`,
+        reading_time: Math.max(1, Math.ceil(html.replace(/<[^>]*>/g, '').split(/\s+/).length / 200)),
       });
 
       toast.success('Log saved as draft! Redirecting to editor...');
-      navigate(`/rapi/editor/${newPost.id}`);
+      if (newPost) {
+        navigate(`/rapi/editor/${newPost.id}`);
+      }
     },
     [navigate],
   );

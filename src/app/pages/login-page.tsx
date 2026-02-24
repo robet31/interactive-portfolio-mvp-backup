@@ -143,8 +143,8 @@ export function LoginPage() {
             transition={{ duration: 0.4, delay: 0.1 }}
             className="flex items-center justify-center gap-2 mb-4"
           >
-            <img src={logo} alt="Ravnx" className="h-10 w-auto object-contain" />
-            <span className="text-foreground tracking-tight" style={{ fontSize: '1.5rem', fontWeight: 700 }}>
+            <img src={logo} alt="Ravnx" className="h-12 w-auto object-contain" />
+            <span className="text-foreground tracking-tight" style={{ fontSize: '2rem', fontWeight: 700 }}>
               Ravnx<span className="text-primary">.</span>
             </span>
           </motion.div>
@@ -154,9 +154,9 @@ export function LoginPage() {
             animate={{ opacity: 1 }}
             transition={{ duration: 0.4, delay: 0.2 }}
           >
-            <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-4">
+            {/* <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-4">
               <Shield className="w-6 h-6 text-primary" />
-            </div>
+            </div> */}
             <h1 className="!text-xl sm:!text-2xl text-foreground">Admin Dashboard</h1>
             <p className="text-muted-foreground mt-2 text-sm">
               Masuk untuk mengelola konten

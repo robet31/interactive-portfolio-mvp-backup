@@ -1,17 +1,29 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { Search } from 'lucide-react';
 import { Input } from '../components/ui/input';
 import { BlogCard } from '../components/blog/blog-card';
 import { CategoryFilter } from '../components/blog/category-filter';
-import { getPublishedPosts } from '../lib/store';
+import { getPublishedPostsFromDb } from '../lib/db';
+import type { Post } from '../lib/types';
 
 export function BlogPage() {
   const [category, setCategory] = useState('All');
   const [search, setSearch] = useState('');
+  const [posts, setPosts] = useState<Post[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const posts = useMemo(() => {
-    let filtered = getPublishedPosts();
+  useEffect(() => {
+    async function loadPosts() {
+      const data = await getPublishedPostsFromDb();
+      setPosts(data);
+      setLoading(false);
+    }
+    loadPosts();
+  }, []);
+
+  const filteredPosts = useMemo(() => {
+    let filtered = posts;
     if (category !== 'All') {
       filtered = filtered.filter(p => p.category === category);
     }
@@ -26,9 +38,21 @@ export function BlogPage() {
     return filtered.sort(
       (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
     );
-  }, [category, search]);
+  }, [posts, category, search]);
 
-  const [featured, ...rest] = posts;
+  const [featured, ...rest] = filteredPosts;
+
+  if (loading) {
+    return (
+      <div className="pt-20 md:pt-24 pb-16">
+        <div className="max-w-6xl mx-auto px-6">
+          <div className="text-center py-20">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="pt-20 md:pt-24 pb-16">

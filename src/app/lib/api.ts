@@ -1,6 +1,6 @@
 import type { Post, Experience, Project, Certification } from './types';
 
-const API_BASE_URL = 'http://localhost:4000/api';
+const API_BASE_URL = import.meta.env.PROD ? '/api' : 'http://localhost:4000/api';
 
 async function fetchFromApi<T>(endpoint: string): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${endpoint}`);

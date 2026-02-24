@@ -31,11 +31,12 @@ export interface Experience {
   id: string;
   title: string;
   organization: string;
-  period: string;
+  period?: string;
   description: string;
   tags: string[];
   type: ExperienceType;
-  image?: string;
+  image?: string; // Legacy single image
+  images?: string[]; // Multiple images for gallery
   startDate?: string; // YYYY-MM format for sorting/grouping
 }
 
