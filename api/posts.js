@@ -13,15 +13,15 @@ export async function GET(request) {
       return Response.json(result.rows);
     }
     
-    // GET /api/posts/published - if (path === '/api/posts/published') {
-      const result = await published only
-    pool.query(
+    // GET /api/posts/published - published only
+    if (path === '/api/posts/published') {
+      const result = await pool.query(
         "SELECT * FROM posts WHERE status = 'published' ORDER BY created_at DESC"
       );
       return Response.json(result.rows);
     }
- /api/posts/:    
-    // GETslug - single post
+    
+    // GET /api/posts/:slug - single post
     const slugMatch = path.match(/^\/api\/posts\/(.+)$/);
     if (slugMatch) {
       const slug = slugMatch[1];
