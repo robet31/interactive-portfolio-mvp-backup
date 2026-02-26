@@ -133,7 +133,7 @@ export async function getPublishedPostsFromDb(forceRefresh = false): Promise<Pos
 
 export async function getPostBySlugFromDb(slug: string): Promise<Post | undefined> {
   try {
-    const row = await fetchFromApi<Post>(`/posts/${slug}`);
+    const row = await fetchFromApi<Post>(`/posts?slug=${encodeURIComponent(slug)}`);
     return {
       id: String(row.id),
       title: row.title,
@@ -279,7 +279,7 @@ export async function createPostInDb(data: Partial<Post>): Promise<Post | null> 
 
 export async function updatePostInDb(id: string, data: Partial<Post>): Promise<Post | null> {
   try {
-    const result = await fetchFromApi<Post>(`/posts/${id}`, {
+    const result = await fetchFromApi<Post>(`/posts?id=${encodeURIComponent(id)}`, {
       method: 'PUT',
       body: JSON.stringify(data),
     });
@@ -292,7 +292,7 @@ export async function updatePostInDb(id: string, data: Partial<Post>): Promise<P
 
 export async function deletePostInDb(id: string): Promise<boolean> {
   try {
-    await fetchFromApi(`/posts/${id}`, { method: 'DELETE' });
+    await fetchFromApi(`/posts?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
     return true;
   } catch (error) {
     console.error('Error deleting post:', error);

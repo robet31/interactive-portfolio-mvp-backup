@@ -2,34 +2,44 @@ import pool from './db.js';
 
 export const dynamic = 'force-dynamic';
 
+// Handle ALL /api/posts routes
 export async function GET(request) {
   const url = new URL(request.url);
   const path = url.pathname;
+  const postId = url.searchParams.get('id');
+  const slug = url.searchParams.get('slug');
 
   try {
     // GET /api/posts - all posts
-    if (path === '/api/posts') {
+    if (path === '/api/posts' && !postId && !slug) {
       const result = await pool.query('SELECT * FROM posts ORDER BY created_at DESC');
       return Response.json(result.rows);
     }
     
-    // GET /api/posts/published - published only
-    if (path === '/api/posts/published') {
-      const result = await pool.query(
-        "SELECT * FROM posts WHERE status = 'published' ORDER BY created_at DESC"
-      );
-      return Response.json(result.rows);
-    }
-    
-    // GET /api/posts/:slug - single post
-    const slugMatch = path.match(/^\/api\/posts\/(.+)$/);
-    if (slugMatch) {
-      const slug = slugMatch[1];
+    // GET /api/posts?slug=xxx - single post by slug
+    if (path === '/api/posts' && slug) {
       const result = await pool.query('SELECT * FROM posts WHERE slug = $1', [slug]);
       if (result.rows.length === 0) {
         return Response.json({ error: 'Post not found' }, { status: 404 });
       }
       return Response.json(result.rows[0]);
+    }
+    
+    // GET /api/posts?id=xxx - single post by ID
+    if (path === '/api/posts' && postId) {
+      const result = await pool.query('SELECT * FROM posts WHERE id = $1', [postId]);
+      if (result.rows.length === 0) {
+        return Response.json({ error: 'Post not found' }, { status: 404 });
+      }
+      return Response.json(result.rows[0]);
+    }
+    
+    // Legacy: /api/posts/published
+    if (path === '/api/posts/published') {
+      const result = await pool.query(
+        "SELECT * FROM posts WHERE status = 'published' ORDER BY created_at DESC"
+      );
+      return Response.json(result.rows);
     }
     
     return Response.json({ error: 'Not found' }, { status: 404 });
@@ -66,14 +76,12 @@ export async function POST(request) {
 export async function PUT(request) {
   try {
     const url = new URL(request.url);
-    const path = url.pathname;
-    const idMatch = path.match(/^\/api\/posts\/(\d+)$/);
+    const postId = url.searchParams.get('id');
     
-    if (!idMatch) {
-      return Response.json({ error: 'Invalid post ID' }, { status: 400 });
+    if (!postId) {
+      return Response.json({ error: 'Post ID is required (use ?id=xxx)' }, { status: 400 });
     }
     
-    const id = idMatch[1];
     const body = await request.json();
     const { title, slug, content, excerpt, cover_image_url, category, status, reading_time } = body;
     
@@ -82,7 +90,7 @@ export async function PUT(request) {
     const result = await pool.query(
       `UPDATE posts SET title = $1, slug = $2, content = $3, excerpt = $4, cover_image_url = $5, category = $6, status = $7, reading_time = $8, updated_at = NOW()
        WHERE id = $9 RETURNING *`,
-      [title, postSlug, content || '', excerpt || '', cover_image_url, category, status, reading_time, id]
+      [title, postSlug, content || '', excerpt || '', cover_image_url, category, status, reading_time, postId]
     );
     
     if (result.rows.length === 0) {
@@ -99,15 +107,13 @@ export async function PUT(request) {
 export async function DELETE(request) {
   try {
     const url = new URL(request.url);
-    const path = url.pathname;
-    const idMatch = path.match(/^\/api\/posts\/(\d+)$/);
+    const postId = url.searchParams.get('id');
     
-    if (!idMatch) {
-      return Response.json({ error: 'Invalid post ID' }, { status: 400 });
+    if (!postId) {
+      return Response.json({ error: 'Post ID is required (use ?id=xxx)' }, { status: 400 });
     }
     
-    const id = idMatch[1];
-    await pool.query('DELETE FROM posts WHERE id = $1', [id]);
+    await pool.query('DELETE FROM posts WHERE id = $1', [postId]);
     return Response.json({ success: true });
   } catch (error) {
     console.error('Error deleting post:', error);
