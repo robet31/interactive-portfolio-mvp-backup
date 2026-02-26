@@ -2,8 +2,12 @@
 // OpenRouter AI Service for Daily Log
 // ═══════════════════════════════════════════
 
-const OPENROUTER_API_KEY = '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';
+const OPENROUTER_API_KEY = import.meta.env.VITE_OPENROUTER_API_KEY || '';
 const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1/chat/completions';
+
+if (!OPENROUTER_API_KEY) {
+  console.warn('WARNING: VITE_OPENROUTER_API_KEY is not set. AI features will not work.');
+}
 
 // Free models with automatic fallback — ordered by preference
 // All models use the :free tier on OpenRouter
@@ -111,6 +115,10 @@ export async function generateLogEntry(
   onChunk?: (chunk: string) => void,
   onModelInfo?: (modelName: string) => void,
 ): Promise<string> {
+  if (!OPENROUTER_API_KEY) {
+    throw new Error('OpenRouter API key not configured. Please set VITE_OPENROUTER_API_KEY environment variable.');
+  }
+  
   let lastError: Error | null = null;
   const MAX_RETRIES = 3;
 
